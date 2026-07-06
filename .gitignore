@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# generated embeddings cache
+brand-assets/.embeddings-cache.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
