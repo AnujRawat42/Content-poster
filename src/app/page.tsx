@@ -1,33 +1,63 @@
 "use client";
 
 import { useState } from "react";
-import { POST_CATEGORIES } from "@/lib/types";
-import type { CreatePostResponse, PostCategory } from "@/lib/types";
+import { CAROUSEL_OPTION, DROPDOWN_OPTIONS, INFOGRAPHIC_OPTION } from "@/lib/types";
+import type { CarouselResponse, CreatePostResponse, DropdownOption } from "@/lib/types";
+import CarouselView from "@/components/CarouselView";
 
 export default function Home() {
   const [topic, setTopic] = useState("");
-  const [category, setCategory] = useState<PostCategory>(POST_CATEGORIES[0]);
+  const [category, setCategory] = useState<DropdownOption>(DROPDOWN_OPTIONS[0]);
+  const [carouselInstructions, setCarouselInstructions] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CreatePostResponse | null>(null);
+  const [carousel, setCarousel] = useState<CarouselResponse | null>(null);
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
+  const [tweet, setTweet] = useState("");
+  const [tweetLoading, setTweetLoading] = useState(false);
+  const [tweetCopied, setTweetCopied] = useState(false);
+  const [caption, setCaption] = useState("");
+  const [captionCopied, setCaptionCopied] = useState(false);
+
+  const isCarousel = category === CAROUSEL_OPTION;
+  const isInfographic = category === INFOGRAPHIC_OPTION;
+  const isImageMode = isCarousel || isInfographic;
 
   async function handleGenerate() {
     if (!topic.trim()) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setCarousel(null);
+    setTweet("");
+    setCaption("");
     try {
-      const res = await fetch("/api/create-post", {
+      const endpoint = isCarousel
+        ? "/api/create-carousel"
+        : isInfographic
+          ? "/api/create-infographics"
+          : "/api/create-post";
+      const payload = isCarousel
+        ? { topic, carouselInstructions: carouselInstructions.trim() || undefined }
+        : isInfographic
+          ? { topic, infographicInstructions: carouselInstructions.trim() || undefined }
+          : { topic, category };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, category }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "generation failed");
-      setResult(data);
-      setDraft(data.draft);
+      if (isImageMode) {
+        setCarousel(data);
+        setCaption(data.caption ?? "");
+      } else {
+        setResult(data);
+        setDraft(data.draft);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "something went wrong");
     } finally {
@@ -39,6 +69,38 @@ export default function Home() {
     await navigator.clipboard.writeText(draft);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleCopyCaption() {
+    await navigator.clipboard.writeText(caption);
+    setCaptionCopied(true);
+    setTimeout(() => setCaptionCopied(false), 1500);
+  }
+
+  async function handleRepurposeTwitter() {
+    if (!draft.trim()) return;
+    setTweetLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/repurpose-twitter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "twitter repurpose failed");
+      setTweet(data.thread);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "something went wrong");
+    } finally {
+      setTweetLoading(false);
+    }
+  }
+
+  async function handleCopyTweet() {
+    await navigator.clipboard.writeText(tweet);
+    setTweetCopied(true);
+    setTimeout(() => setTweetCopied(false), 1500);
   }
 
   return (
@@ -68,9 +130,9 @@ export default function Home() {
             <select
               className="w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2 text-sm text-black dark:text-zinc-50"
               value={category}
-              onChange={(e) => setCategory(e.target.value as PostCategory)}
+              onChange={(e) => setCategory(e.target.value as DropdownOption)}
             >
-              {POST_CATEGORIES.map((c) => (
+              {DROPDOWN_OPTIONS.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
@@ -78,18 +140,92 @@ export default function Home() {
             </select>
           </div>
 
+          {isImageMode && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                {isCarousel ? "Carousel instructions (optional)" : "Infographic instructions (optional)"}
+              </label>
+              <textarea
+                className="w-full min-h-20 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-sm text-black dark:text-zinc-50"
+                value={carouselInstructions}
+                onChange={(e) => setCarouselInstructions(e.target.value)}
+                placeholder={
+                  isCarousel
+                    ? "e.g. Minimalist design, bold colors, one stat per slide, focus on data-driven insights..."
+                    : "e.g. Focus on adoption stats, one big number per slide, compare 2023 vs 2026..."
+                }
+              />
+            </div>
+          )}
+
           <button
             onClick={handleGenerate}
             disabled={loading || !topic.trim()}
             className="self-start rounded-full bg-black dark:bg-zinc-50 text-white dark:text-black px-5 py-2.5 text-sm font-medium disabled:opacity-50"
           >
-            {loading ? "Researching + writing... (10-20s)" : "Generate"}
+            {loading
+              ? isImageMode
+                ? "Researching + generating slides... (30-60s)"
+                : "Researching + writing... (10-20s)"
+              : "Generate"}
           </button>
 
           {error && (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
         </div>
+
+        {carousel && (
+          <div className="mt-10 flex flex-col gap-4">
+            <CarouselView slides={carousel.slides} />
+
+            {carousel.caption && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Post caption
+                  </label>
+                  <button
+                    onClick={handleCopyCaption}
+                    className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"
+                  >
+                    {captionCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+                <textarea
+                  className="w-full min-h-48 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-sm text-black dark:text-zinc-50 whitespace-pre-wrap"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                />
+              </div>
+            )}
+
+            {carousel.research.sources.length > 0 && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400 font-medium">
+                  Sources used ({carousel.research.sources.length})
+                </summary>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {carousel.research.sources.map((s) => (
+                    <li key={s.url}>
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {s.title}
+                      </a>
+                      {s.publishedDate && (
+                        <span className="text-zinc-500 dark:text-zinc-500"> — {s.publishedDate}</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
 
         {result && (
           <div className="mt-10 flex flex-col gap-4">
@@ -111,6 +247,37 @@ export default function Home() {
                 onChange={(e) => setDraft(e.target.value)}
               />
             </div>
+
+            <div>
+              <button
+                onClick={handleRepurposeTwitter}
+                disabled={tweetLoading || !draft.trim()}
+                className="self-start rounded-full border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-black dark:text-zinc-50 px-4 py-2 text-sm font-medium disabled:opacity-50"
+              >
+                {tweetLoading ? "Repurposing... (5-10s)" : "Repurpose for Twitter"}
+              </button>
+            </div>
+
+            {tweet && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Twitter / X
+                  </label>
+                  <button
+                    onClick={handleCopyTweet}
+                    className="text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-zinc-50"
+                  >
+                    {tweetCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+                <textarea
+                  className="w-full min-h-48 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 text-sm text-black dark:text-zinc-50 whitespace-pre-wrap"
+                  value={tweet}
+                  onChange={(e) => setTweet(e.target.value)}
+                />
+              </div>
+            )}
 
             <details className="text-sm">
               <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400 font-medium">

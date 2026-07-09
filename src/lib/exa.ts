@@ -6,7 +6,7 @@ let client: Exa | null = null;
 function getClient(): Exa {
   if (!client) {
     const apiKey = process.env.EXA_API_KEY;
-    if (!apiKey) throw new Error("EXA_API_KEY is not set in .env.local");
+    if (!apiKey) throw new Error("EXA_API_KEY is not set in .env");
     client = new Exa(apiKey);
   }
   return client;

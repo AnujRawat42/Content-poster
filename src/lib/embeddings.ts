@@ -12,7 +12,7 @@ let openai: OpenAI | null = null;
 function getClient(): OpenAI {
   if (!openai) {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not set in .env.local");
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not set in .env");
     openai = new OpenAI({ apiKey });
   }
   return openai;

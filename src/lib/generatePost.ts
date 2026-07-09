@@ -12,7 +12,7 @@ let openai: OpenAI | null = null;
 function getClient(): OpenAI {
   if (!openai) {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not set in .env.local");
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not set in .env");
     openai = new OpenAI({ apiKey });
   }
   return openai;
@@ -43,8 +43,7 @@ ${profile || "(no profile provided)"}
 STYLE REFERENCE — these posts are from OTHER authors, written about unrelated topics and contexts. Use them ONLY to learn writing mechanics: hook style, line-break rhythm, sentence length, use of short punchy lines vs paragraphs, how lists/numbers are formatted, tone of voice. Do NOT reuse their facts, claims, stories, examples, or specific content in the new post — those belong to different people and different situations:
 ${referencesBlock}
 
-POST TYPE: ${req.category}
-STRUCTURE GUIDANCE FOR THIS TYPE: ${CATEGORY_GUIDANCE[req.category]}
+${req.category ? `POST TYPE: ${req.category}\nSTRUCTURE GUIDANCE FOR THIS TYPE: ${CATEGORY_GUIDANCE[req.category]}` : "POST TYPE: a caption to accompany a set of images (a carousel or infographics) being posted alongside this text. Write a strong standalone LinkedIn post that hooks the reader and makes them want to look at the images. Do not say things like \"see slide 1\"; the post should read well on its own."}
 
 HARD RULES:
 - Never use an em dash (—) or en dash (–), anywhere, for any reason. Use a period, comma, or start a new line instead.

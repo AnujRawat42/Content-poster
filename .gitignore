@@ -38,6 +38,10 @@ yarn-error.log*
 
 # generated embeddings cache
 brand-assets/.embeddings-cache.json
+brand-assets/.carousel-style-cache.json
+
+# generated carousel images
+public/generated/
 
 # typescript
 *.tsbuildinfo

@@ -10,6 +10,14 @@ export const POST_CATEGORIES = [
 
 export type PostCategory = (typeof POST_CATEGORIES)[number];
 
+export const CAROUSEL_OPTION = "4-Slide Carousel" as const;
+
+export const INFOGRAPHIC_OPTION = "Infographics" as const;
+
+export const DROPDOWN_OPTIONS = [...POST_CATEGORIES, CAROUSEL_OPTION, INFOGRAPHIC_OPTION] as const;
+
+export type DropdownOption = (typeof DROPDOWN_OPTIONS)[number];
+
 export interface ResearchSource {
   title: string;
   url: string;
@@ -24,7 +32,7 @@ export interface ResearchResult {
 
 export interface GenerateRequest {
   topic: string;
-  category: PostCategory;
+  category?: PostCategory;
   research: ResearchResult;
 }
 
@@ -37,4 +45,29 @@ export interface CreatePostResponse {
   draft: string;
   research: ResearchResult;
   referencesUsed: string[];
+}
+
+export interface RepurposeTwitterRequest {
+  draft: string;
+}
+
+export interface RepurposeTwitterResponse {
+  thread: string;
+}
+
+export interface CreateCarouselRequest {
+  topic: string;
+  carouselInstructions?: string;
+}
+
+export interface CreateInfographicRequest {
+  topic: string;
+  infographicInstructions?: string;
+}
+
+export interface CarouselResponse {
+  sessionId: string;
+  slides: string[];
+  research: ResearchResult;
+  caption: string;
 }
