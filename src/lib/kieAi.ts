@@ -86,7 +86,10 @@ async function pollTaskUntilDone(taskId: string): Promise<string> {
   throw new Error(`kie.ai task ${taskId} timed out after ${POLL_TIMEOUT_MS}ms`);
 }
 
-export async function generateImage(prompt: string, aspectRatio = "21:9"): Promise<Buffer> {
+const MAX_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 5000;
+
+async function generateImageOnce(prompt: string, aspectRatio: string): Promise<Buffer> {
   const taskId = await createNanoBananaTask(prompt, aspectRatio);
   const imageUrl = await pollTaskUntilDone(taskId);
 
@@ -94,6 +97,25 @@ export async function generateImage(prompt: string, aspectRatio = "21:9"): Promi
   if (!imageRes.ok) throw new Error(`failed to download generated image: ${imageRes.status}`);
 
   return Buffer.from(await imageRes.arrayBuffer());
+}
+
+export async function generateImage(prompt: string, aspectRatio = "21:9"): Promise<Buffer> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await generateImageOnce(prompt, aspectRatio);
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(
+          `kie.ai image generation attempt ${attempt}/${MAX_ATTEMPTS} failed, retrying in ${RETRY_DELAY_MS}ms:`,
+          err instanceof Error ? err.message : err,
+        );
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
+    }
+  }
+  throw lastError;
 }
 
 async function sliceIntoSlides(wideImage: Buffer, slideCount: number): Promise<Buffer[]> {

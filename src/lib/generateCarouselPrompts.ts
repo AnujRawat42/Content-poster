@@ -37,12 +37,13 @@ interface InfographicSpec {
 }
 
 interface PanelPlan {
-  role: "hook" | "content" | "cta";
-  step?: string; // "01" | "02" | "03" on content panels
+  role: "hook" | "content";
   headline: string;
   support?: string;
   icon?: string; // short flat-vector icon description, e.g. "upward bar chart icon"
+  icons?: string[]; // hook panel only: multiple short flat-vector icon descriptions
   infographic?: InfographicSpec | null;
+  followForMore?: string; // last content panel only: small closing note, e.g. "Follow for more"
 }
 
 interface CarouselPlan {
@@ -65,6 +66,13 @@ function validatePlan(raw: unknown, expectedPanels: number): CarouselPlan {
   for (const panel of plan.panels) {
     if (!panel.headline || typeof panel.headline !== "string") {
       throw new Error("carousel plan panel is missing a headline");
+    }
+    if (panel.role === "hook") {
+      if (Array.isArray(panel.icons)) {
+        panel.icons = panel.icons.filter((i) => typeof i === "string" && i.trim()).slice(0, 4);
+      }
+    } else {
+      panel.role = "content";
     }
     const info = panel.infographic;
     if (info) {
@@ -108,12 +116,11 @@ ${feedbackBlock}
 CUSTOM CAROUSEL INSTRUCTIONS FROM THE AUTHOR (take priority when they conflict with defaults):
 ${instructionsBlock}
 
-PANEL STRUCTURE (exactly 4 panels, in order):
-1. role "hook" — bold attention-grabbing headline about the topic. Max 8 words. Optional 1-line support.
-2-3. role "content" — one clear idea each (a stat, a step, a myth-vs-fact, an insight), grounded in the research. Give each: step ("01"/"02"), headline (max 6-8 words), support (max 2 short lines), icon (short flat-vector icon description), and an infographic when the research gives you real numbers for it.
-4. role "cta" — headline "Follow for more" or a close natural variant. No infographic.
+PANEL STRUCTURE (exactly 4 panels, in order, all flowing as one consecutive story, no panel numbers or step counters anywhere):
+1. role "hook" — bold attention-grabbing headline about the topic. Max 8 words. Optional 1-line support. Also give "icons": 2-4 short flat-vector icon descriptions, all relevant to the topic (this panel shows multiple small relevant icons, not just one).
+2-4. role "content" — one clear idea each (a stat, a step, a myth-vs-fact, an insight), grounded in the research, presented as consecutive information continuing the story from the panel before it. Give each: headline (max 6-8 words), support (max 2 short lines), icon (short flat-vector icon description), and an infographic when the research gives you real numbers for it. The 4th (last) content panel additionally gets a small "followForMore" closing note, e.g. "Follow for more", shown small alongside its own content, NOT as its own separate screen.
 
-Because there are only 2 content panels, make them count: pick the two strongest, most distinct ideas, and give each a real data infographic whenever the research supports it.
+Because there are 3 content panels, make them count: pick the strongest, most distinct ideas, and give each a real data infographic whenever the research supports it.
 
 INFOGRAPHICS — the whole point. For each content panel, look at what the research actually contains and pick the infographic type that best expresses it:
 - "big-stat": one dominant number ("73%", "3x", "$2.4B"). Use for a single striking figure.
@@ -132,7 +139,7 @@ CONTENT RULES:
 - All text will be rendered inside an image, so keep every string short and unambiguous.
 
 Return strictly valid JSON, no markdown fences, in this exact shape:
-{"background": "dark" or "light", "panels": [{"role": "hook", "headline": "...", "support": "..."}, {"role": "content", "step": "01", "headline": "...", "support": "...", "icon": "...", "infographic": {"type": "big-stat", "data": [{"label": "...", "value": "..."}]}}, {"role": "content", "step": "02", "headline": "...", "support": "...", "icon": "...", "infographic": {"type": "bar", "data": [{"label": "...", "value": "..."}]}}, {"role": "cta", "headline": "..."}]}`;
+{"background": "dark" or "light", "panels": [{"role": "hook", "headline": "...", "support": "...", "icons": ["...", "...", "..."]}, {"role": "content", "headline": "...", "support": "...", "icon": "...", "infographic": {"type": "big-stat", "data": [{"label": "...", "value": "..."}]}}, {"role": "content", "headline": "...", "support": "...", "icon": "...", "infographic": {"type": "bar", "data": [{"label": "...", "value": "..."}]}}, {"role": "content", "headline": "...", "support": "...", "icon": "...", "infographic": null, "followForMore": "Follow for more"}]}`;
 
   const userPrompt = `TOPIC / ROUGH IDEA:
 ${topic}
@@ -179,16 +186,17 @@ function describePanel(panel: PanelPlan, index: number): string {
 
   if (panel.role === "hook") {
     lines.push(
-      `PANEL ${pos} (HOOK): The headline "${panel.headline}" rendered as the biggest text in the whole image, bold and attention-grabbing.`,
+      `Panel ${pos}, the opening slide. Its first and topmost text is the headline "${panel.headline}", rendered as the biggest text in the whole image, bold and attention-grabbing. Nothing sits above the headline: no label, category, kicker, number, or title of any kind.`,
     );
     if (panel.support) lines.push(`Below it, one smaller supporting line: "${panel.support}".`);
-  } else if (panel.role === "cta") {
-    lines.push(
-      `PANEL ${pos} (CTA): Large bold text "${panel.headline}" centered, with a simple purple arrow or pointer icon.`,
-    );
+    if (panel.icons && panel.icons.length) {
+      lines.push(
+        `Include ${panel.icons.length} small relevant flat vector icons arranged near the headline, exactly: ${panel.icons.join(", ")}.`,
+      );
+    }
   } else {
     lines.push(
-      `PANEL ${pos} (CONTENT): Top-to-bottom sections in this exact order: large step number "${panel.step ?? String(pos - 1).padStart(2, "0")}" in purple, then the headline "${panel.headline}", then a thin purple divider line.`,
+      `Panel ${pos}. Its first and topmost text is the headline "${panel.headline}" — nothing sits above it: no label, category, kicker, number, or title of any kind. Below the headline, a thin purple divider line.`,
     );
     if (panel.infographic) {
       lines.push(`Below the divider, the panel's centerpiece infographic: ${describeInfographic(panel.infographic)}.`);
@@ -196,6 +204,11 @@ function describePanel(panel: PanelPlan, index: number): string {
     } else {
       if (panel.support) lines.push(`Below the divider, supporting text: "${panel.support}".`);
       if (panel.icon) lines.push(`At the bottom, a ${panel.icon}, flat vector style.`);
+    }
+    if (panel.followForMore) {
+      lines.push(
+        `In addition, small and unobtrusive near the bottom of this same panel (alongside its content, not a separate screen), the closing text: "${panel.followForMore}".`,
+      );
     }
   }
 
@@ -214,17 +227,17 @@ function buildImagePrompt(plan: CarouselPlan, panelDescriptions: string): string
 
 GLOBAL STYLE, identical across all ${count} panels: ${palette}. Thick, bold, heavy-weight modern geometric sans-serif typography (Inter-like / Montserrat-like), never thin, cursive, script, handwritten, serif, or decorative fonts. Premium, tech-forward, minimal, lots of breathing room. Flat vector icons and infographics only, all in one consistent line weight and style. Subtle continuous background gradient may flow across panels, but no text, icon, chart, or key element may cross or sit within 6% of a panel boundary — keep each boundary zone clean background only.
 
-TYPOGRAPHY — every panel must mix font sizes boldly for strong visual contrast: one very large, thick, punchy headline or number, paired with clearly smaller labels and supporting text. Never make all text the same size. Headlines and key numbers should be heavy and dominant; labels and captions clearly lighter and smaller, but still readable on a phone.
+TYPOGRAPHY — calm, comfortable hierarchy that is easy on the eyes: each panel has ONE clearly dominant element (the headline or the key number) at a large but not overwhelming size, filling at most 2 lines and never more than 70% of the panel width. All other text is clearly smaller and set in a regular or medium weight, never bold. Use generous line spacing (at least 1.3x) and letter spacing on every text block. Never cram text, never stretch or condense letters, never use all-caps for sentences longer than 3 words. Every string must stay comfortably readable on a phone without straining.
 
-ICONS — every panel must include at least one relevant flat vector icon or simple pictogram that visually represents THAT panel's specific topic (for example a rocket for growth, a shield for security, a bar chart for data, a lightbulb for an idea, a clock for speed). Icons must be simple, single-color or purple-gradient, in one consistent line weight across all panels, and clearly tied to that panel's text. These are concept icons only, never company logos, brand marks, or social-media icons.
+ICONS — every panel must include one or two relevant flat vector icons or simple pictograms that visually represent THAT panel's specific topic (for example a rocket for growth, a shield for security, a bar chart for data, a lightbulb for an idea, a clock for speed). Icons must be simple, single-color or purple-gradient, in one consistent line weight across all panels, and clearly tied to that panel's text. These are concept icons only, never company logos, brand marks, or social-media icons.
 
 LAYOUT CONSISTENCY — every panel shares the SAME invisible grid: identical outer margins on all sides, the same left text alignment, the same vertical rhythm, and headlines that start at the same height across panels. Text must never touch or crowd panel edges. Keep at most 3 text blocks per panel so nothing feels cramped.
 
-TEXT ACCURACY — critical: render ONLY the exact texts quoted in the panel descriptions below, spelled exactly as written, and NOTHING else. No extra words, labels, captions, fine print, placeholder text, lorem ipsum, or gibberish characters anywhere. Every number must match its quoted value exactly.
+TEXT ACCURACY — critical: render ONLY the exact texts quoted in the panel descriptions below, spelled exactly as written, and NOTHING else. No extra words, labels, captions, fine print, placeholder text, lorem ipsum, or gibberish characters anywhere. Every number must match its quoted value exactly. The panel descriptions below are INSTRUCTIONS to you, not text to render: never print structural words like "Panel", "Hook", "Content", "CTA", "Slide", "Headline", or any panel number/label anywhere in the image — only the quoted strings themselves appear.
 
-FORBIDDEN — never include any of these anywhere in the image: logos, brand marks, watermarks, signatures, URLs, @ handles, QR codes, social media icons, profile pictures, avatars, user badges, or any real person's face or photo. Do not draw placeholders for them either (no empty circles, no "logo here" boxes, no "Logo" text). The real logo and profile badge are added by separate software afterward, so drawing your own would collide with them.
+FORBIDDEN — never include any of these anywhere in the image: real brand logos, watermarks, signatures, URLs, @ handles, QR codes, social media icons, profile pictures, avatars, verification checkmarks/badges, or any real person's face or photo. Do not draw placeholders for them either (no empty circles, no "logo here" boxes, no "Logo" text). Also never render any slide/panel numbers, step counters, or index marks anywhere. The real brand logo is added by separate software afterward, so drawing your own would collide with it.
 
-RESERVED ZONES — leave these completely empty background on EVERY panel so the composited branding never overlaps content: (1) the TOP-LEFT corner, roughly the top 18% of the panel height by the left 55% of the panel width, kept clear for a profile badge; (2) the BOTTOM-RIGHT corner, roughly the bottom 16% of the panel height by the right 40% of the panel width, kept clear for the brand logo. No text, numbers, icons, dividers, charts, or graphics may enter or touch either of these regions.
+RESERVED ZONE — leave this completely empty background on EVERY panel so the composited brand logo never overlaps content: the BOTTOM-CENTER area, roughly the bottom 16% of the panel height by the center 40% of the panel width, kept clear for the brand logo. No text, numbers, icons, dividers, charts, or graphics may enter or touch this region.
 
 ${panelDescriptions}`;
 }
@@ -403,7 +416,7 @@ function describeStylePanel(plan: InfographicContentPlan, style: InfographicStyl
   const elementDescriptions = plan.elements.map((e) => describeInfographic(e)).join("; ");
 
   return [
-    `PANEL ${index + 1} — STYLE "${style.name}". Background for this panel only: ${palette}. ${style.layout}`,
+    `Panel ${index + 1}, in the "${style.name}" style (style name is for you only, never rendered). Background for this panel only: ${palette}. ${style.layout}`,
     `Headline, exactly: "${plan.headline}".`,
     plan.subheadline ? `Subheadline, exactly: "${plan.subheadline}".` : null,
     `Data to visualize: ${elementDescriptions}.`,
@@ -428,7 +441,7 @@ TYPOGRAPHY — every panel must mix font sizes boldly for strong visual contrast
 
 ICONS — every panel must include at least one relevant flat vector icon or simple pictogram that visually represents THAT panel's specific topic (for example a rocket for growth, a shield for security, a bar chart for data, a lightbulb for an idea, a clock for speed). Icons must be simple, single-color or purple-gradient, in one consistent line weight across all panels, and clearly tied to that panel's text. These are concept icons only, never company logos, brand marks, or social-media icons.
 
-TEXT ACCURACY — critical: render ONLY the exact text and numbers quoted below, spelled exactly as written, and NOTHING else. No extra words, captions, fine print, placeholder text, lorem ipsum, or gibberish characters anywhere. Every number must match its quoted value exactly.
+TEXT ACCURACY — critical: render ONLY the exact text and numbers quoted below, spelled exactly as written, and NOTHING else. No extra words, captions, fine print, placeholder text, lorem ipsum, or gibberish characters anywhere. Every number must match its quoted value exactly. The panel descriptions below are INSTRUCTIONS to you, not text to render: never print structural words like "Panel", "Style", "Headline", "Subheadline", or any panel number/label anywhere in the image — only the quoted strings themselves appear.
 
 FORBIDDEN — never include any of these anywhere in the image: logos, brand marks, watermarks, signatures, URLs, @ handles, QR codes, social media icons, profile pictures, avatars, user badges, or any real person's face or photo. Do not draw placeholders for them either. The real brand logo is added by separate software afterward, so drawing your own would collide with it.
 

@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Content
 
-## Getting Started
+Personal content pipeline for turning a topic or idea into ready-to-post LinkedIn content: researched posts, LinkedIn carousels (rendered as real PNG slides, not text outlines), standalone infographics, and Twitter/X thread repurposing — all generated with a consistent purple/white/black brand theme and your own brand logo composited onto the output.
 
-First, run the development server:
+## What it does
+
+- **Research** (`/api/research`) — looks up current context/trend data for a topic via [Exa](https://exa.ai) so generated copy and stats are grounded in real information, not invented.
+- **Post generation** (`/api/generate`) — writes a LinkedIn post draft for a topic + category, using your brand profile (`brand-assets/profile.md`) and accumulated feedback notes.
+- **Carousel generation** (`/api/create-carousel`) — plans a 4-panel carousel (hook + consecutive content panels), turns the plan into an image-generation prompt, renders it as one wide image via [kie.ai](https://kie.ai) (nano-banana model), slices it into individual slide PNGs, and composites your brand logo onto each slide.
+- **Infographic generation** (`/api/create-infographics`) — plans one infographic's content, then renders it in several different visual styles side by side so you can pick a favorite; only the brand logo is composited on, no per-slide branding.
+- **Twitter/X repurposing** (`/api/repurpose-twitter`) — turns an existing post draft into a Twitter/X thread.
+- **Carousel feedback** (`/api/carousel-feedback`) — records your notes on past carousels so future generations improve over time.
+
+Generated images are written to `public/generated/<session-id>/` and served statically; brand assets (logo, profile notes, style references, feedback) live in `brand-assets/`.
+
+## Setup
+
+### 1. Prerequisites
+
+- Node.js 20+
+- API keys for:
+  - **OpenAI** — content/copy generation
+  - **Exa** — research/trend lookups
+  - **kie.ai** — image generation (nano-banana model)
+
+### 2. Install
+
+```bash
+npm install
+```
+
+### 3. Configure environment
+
+Create a `.env` file in the project root (this file is gitignored, never commit it):
+
+```bash
+OPENAI_API_KEY=sk-...
+EXA_API_KEY=...
+KIE_API_KEY=...
+```
+
+### 4. Add your brand assets
+
+In `brand-assets/`:
+- `Brand logo.png` — your logo, composited onto generated slides/infographics.
+- `profile.md` — a short description of your brand/voice used to steer content generation.
+- `carousel_feedback.md` — running notes on what to improve (can start empty).
+
+### 5. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Other scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build   # production build
+npm run start   # run the production build
+npm run lint    # eslint
+```
 
-## Learn More
+## Pushing to GitHub
 
-To learn more about Next.js, take a look at the following resources:
+If you're setting this up from scratch (no existing remote):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/<your-username>/<your-repo>.git
+git push -u origin main
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If a remote is already configured (check with `git remote -v`), just commit and push:
 
-## Deploy on Vercel
+```bash
+git add .
+git commit -m "Your commit message"
+git push
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Never commit your `.env` file or API keys.** `.env*` is already gitignored — double check `git status` before pushing if you ever add secrets to a differently-named file.
